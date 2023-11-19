@@ -23,7 +23,7 @@ export class App extends Component {
 
       const initialImages = await fetchImg(this.state.query, this.state.page);
       this.setState({
-        gallery: initialImages,
+        gallery: initialImages.hits,
       });
     } catch (error) {
       this.setState({ error: true });
