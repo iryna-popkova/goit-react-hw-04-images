@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useEffect, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import { Container, GlobalStyle } from './GlobalStyles';
 
@@ -8,77 +8,71 @@ import { ImageGallery } from '../ImageGallery/ImageGallery';
 import { Button } from '../button/Button';
 import { Loader } from '../Loader/Loader';
 
-export class App extends Component {
-  state = {
-    query: ``,
-    gallery: [],
-    page: 1,
-    loading: false,
-    error: false,
+export const App = () => {
+  const [query, setQuery] = useState('');
+  const [gallery, setGallery] = useState([]);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const [totalHits, setTotalHits] = useState(0);
+
+  const onSubmit = searchQuery => {
+    if (searchQuery.trim() === '') {
+      return;
+    } else {
+      setQuery(`${Date.now()}/${searchQuery}`);
+      setPage(1);
+      setGallery([]);
+    }
   };
 
-  async componentDidMount() {
-    try {
-      this.setState({ loading: true, error: false });
+  const onLoadMore = () => {
+    setPage(prevPage => prevPage + 1);
+  };
 
-      const initialImages = await fetchImg(this.state.query, this.state.page);
-      this.setState({
-        gallery: initialImages.hits,
-      });
-    } catch (error) {
-      this.setState({ error: true });
-    } finally {
-      this.setState({ loading: false });
+  useEffect(() => {
+    if (query === '') {
+      return;
     }
-  }
-  async componentDidUpdate(prevProps, prevState) {
-    if (
-      prevState.query !== this.state.query ||
-      prevState.page !== this.state.page
-    ) {
+
+    const normQuery = query.split('/').pop();
+
+    const fetchGallery = async () => {
       try {
-        this.setState({ isLoading: true, error: false });
+        setLoading(true);
+        setError(false);
 
-        const newImages = await fetchImg(this.state.query, this.state.page);
+        const apiResponse = await fetchImg(normQuery, page);
+        const newImages = apiResponse.hits;
+        setTotalHits(apiResponse.totalHits);
 
-        if (newImages.hits.length === 0) {
-          toast.error('No more images available');
+        if (newImages.length === 0) {
+          toast.error('Sorry, nothing was found on your request');
         } else {
-          this.setState(prevState => ({
-            gallery: [...prevState.gallery, ...newImages.hits],
-          }));
+          setGallery(prevGallery => [...prevGallery, ...newImages]);
         }
       } catch (error) {
-        this.setState({ error: true });
+        console.log(error);
+        setError(true);
       } finally {
-        this.setState({ isLoading: false });
+        setLoading(false);
       }
-    }
-  }
+    };
 
-  onSubmit = searchQuery => {
-    this.setState({ query: searchQuery, page: 1, gallery: [] });
-  };
+    fetchGallery();
+  }, [query, page]);
 
-  onLoadMore = () => {
-    this.setState(prevState => ({
-      page: prevState.page + 1,
-    }));
-  };
-
-  render() {
-    const { gallery, loading, error } = this.state;
-
-    return (
-      <Container>
-        <SearchBar onSubmit={this.onSubmit} />
-        {error && <p>Something went wrong! Please reload this page!</p>}
-        {gallery.length > 0 && <ImageGallery images={gallery} />}
-        {loading && <Loader />}
-        {gallery.length > 0 && <Button onLoadMore={this.onLoadMore} />}
-        <GlobalStyle />
-        <Toaster />
-      </Container>
-    );
-  }
-}
+  return (
+    <Container>
+      <SearchBar onSubmit={onSubmit} />
+      {error && <p>Oops! Something went wrong! Please try again</p>}
+      {gallery.length > 0 && <ImageGallery images={gallery} />}
+      {loading && <Loader />}
+      {gallery.length > 0 && !loading && totalHits > gallery.length && (
+        <Button onLoadMore={onLoadMore} />
+      )}
+      <GlobalStyle />
+      <Toaster />
+    </Container>
+  );
+};
